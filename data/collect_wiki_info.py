@@ -57,8 +57,10 @@ def clean_title(title):
         replace(" , ", ", ").\
         replace(" ( ", " (").\
         replace(" ) ", ") ").\
-        replace(" 's", "'s").\
-        replace(" – ", "–")
+        replace(" 's", "'s"). \
+        replace(" 't", "'t"). \
+        replace(" – ", "–"). \
+        replace(" / ", "/")
 
     if title.startswith("( "):
         title = "(" + title[2:]
