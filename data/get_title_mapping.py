@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 def main(args):
     # read wikitext-103 data file
-    with open(args.data_file, "r") as fd:
+    with open(args.data_file, "r", encoding='utf8') as fd:
         lines = [line.strip('\n') for line in fd.readlines()]
 
     # initialization
@@ -35,7 +35,7 @@ def main(args):
 
     # dump results
     with open(args.output_file, "w") as fd:
-        json.dump(results, fd, indent=4)
+        json.dump(results, fd, indent=4, ensure_ascii=False)
 
 
 if __name__ == '__main__':
