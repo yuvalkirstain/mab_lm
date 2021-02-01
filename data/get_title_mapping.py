@@ -31,6 +31,8 @@ def main(args):
         line_idx += 1
         pbar.update(1)
 
+    results[title] = {"start_line_idx": prev_line_idx, "end_line_idx": line_idx - 1}
+
     # dump results
     with open(args.output_file, "w") as fd:
         json.dump(results, fd, indent=4)
