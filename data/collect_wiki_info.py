@@ -31,7 +31,7 @@ def get_title_info(title_idx, title, timeout, to_sleep, silent):
     page_data["query_title"] = title
 
     if to_sleep:
-        sleep(3)
+        sleep(5)
 
     return page_data
 
@@ -59,6 +59,7 @@ def clean_title(title):
         replace(" ) ", ") ").\
         replace(" 's", "'s"). \
         replace(" 't", "'t"). \
+        replace(" 'd", "'d"). \
         replace(" – ", "–"). \
         replace(" / ", "/")
 
