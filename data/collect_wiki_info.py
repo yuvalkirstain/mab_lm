@@ -63,7 +63,9 @@ def clean_title(title):
         if title.endswith(f" {char}"):
             title = title[:-len(char)-1] + char
 
-    title = title.replace(" ( ", " (")
+    title = title. \
+        replace(" ( ", " ("). \
+        replace(" '", "'")
 
     return title
 
