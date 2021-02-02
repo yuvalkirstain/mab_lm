@@ -50,23 +50,19 @@ def query_titles(titles, num_processes, timeout, sleep_freq, silent):
 
 
 def clean_title(title):
-    title = title.\
-        replace(" @-@ ", "-").\
-        replace(" @.@ ", ".").\
-        replace(" @,@ ", ",").\
-        replace(" , ", ", ").\
-        replace(" ( ", " (").\
-        replace(" ) ", ") ").\
-        replace(" 's", "'s"). \
-        replace(" 't", "'t"). \
-        replace(" 'd", "'d"). \
-        replace(" – ", "–"). \
-        replace(" / ", "/")
+    title = title. \
+        replace(" @-@ ", "-"). \
+        replace(" @.@ ", "."). \
+        replace(" @,@ ", ",")
 
-    if title.startswith("( "):
-        title = "(" + title[2:]
-    if title.endswith(" )"):
-        title = title[:-2] + ")"
+    for char in ['.', ',', '–', ':', ';', '!', '?', '\'', '"', '/', '\\', '...', ')']:
+        title = title.replace(f" {char} ", f"{char} ")
+        if title.startswith(f"{char} "):
+            title = char + title[2:]
+        if title.endswith(f" {char}"):
+            title = title[:-2] + char
+
+    title = title.replace(" ( ", " (")
 
     return title
 
@@ -91,8 +87,8 @@ def main(args):
     num_missing_titles_unk = len([title for title in missing_titles if "<unk>" in title])
     print(f"> successfully queried {len(results)} out of {len(titles)} titles.")
     print(f"> {num_missing_titles_unk} of missing titles are due to '<unk>' token.")
-    print(f"> missing titles *not* because of an unknown token:\n",
-          '\n'.join([title for title in missing_titles if "<unk>" not in title]))
+    print(f"> missing titles *not* because of an unknown token (first 50):\n",
+          '\n'.join([title for title in missing_titles if "<unk>" not in title][:50]))
 
     # write results
     for result in results:
