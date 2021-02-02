@@ -53,14 +53,15 @@ def clean_title(title):
     title = title. \
         replace(" @-@ ", "-"). \
         replace(" @.@ ", "."). \
-        replace(" @,@ ", ",")
+        replace(" @,@ ", ","). \
+        replace(" – ", "–")
 
-    for char in ['.', ',', '–', ':', ';', '!', '?', '\'', '"', '/', '\\', '...', ')']:
+    for char in ['.', ',', ':', ';', '!', '?', '\'', '"', '/', '\\', '...', ')']:
         title = title.replace(f" {char} ", f"{char} ")
         if title.startswith(f"{char} "):
-            title = char + title[2:]
+            title = char + title[len(char)+1:]
         if title.endswith(f" {char}"):
-            title = title[:-2] + char
+            title = title[:-len(char)-1] + char
 
     title = title.replace(" ( ", " (")
 
