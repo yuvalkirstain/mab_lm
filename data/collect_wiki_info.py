@@ -102,6 +102,9 @@ def main(args):
         json.dump(title_map, fd, indent=4, ensure_ascii=False)
 
 
+# stats for the training set:
+# successfully queried 27100 out of 29103 titles.
+# 298 of missing titles are due to '<unk>' token.
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('title_map_file', type=str, default='',
