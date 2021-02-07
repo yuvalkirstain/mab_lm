@@ -150,10 +150,10 @@ class DataTrainingArguments:
         else:
             if self.train_file is not None:
                 extension = self.train_file.split(".")[-1]
-                assert extension in ["csv", "json", "txt"], "`train_file` should be a csv, a json or a txt file."
+                assert extension in ["csv", "json", "txt", "tokens"], "`train_file` should be a csv, a json or a txt file."
             if self.validation_file is not None:
                 extension = self.validation_file.split(".")[-1]
-                assert extension in ["csv", "json", "txt"], "`validation_file` should be a csv, a json or a txt file."
+                assert extension in ["csv", "json", "txt", "tokens"], "`validation_file` should be a csv, a json or a txt file."
 
         assert self.scoring_function in ["exp3", "uniform"], "scoring_function should be exp3 or uniform"
 
@@ -244,7 +244,7 @@ def main():
         if data_args.validation_file is not None:
             data_files["validation"] = data_args.validation_file
         extension = data_args.train_file.split(".")[-1]
-        if extension == "txt":
+        if extension in ["txt", "tokens"]:
             extension = "text"
         datasets = load_dataset(extension, data_files=data_files)
     # See more about loading any type of standard or custom dataset (from files, python dict, pandas DataFrame, etc) at
