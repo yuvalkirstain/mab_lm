@@ -240,6 +240,7 @@ def main():
         for i, path in enumerate(train_files):
             if data_args.train_file is not None:
                 data_files[f"train_{i}"] = path
+                logger.info(f"train_{i} path = {path}")
         if data_args.validation_file is not None:
             data_files["validation"] = data_args.validation_file
         extension = data_args.train_file.split(".")[-1]

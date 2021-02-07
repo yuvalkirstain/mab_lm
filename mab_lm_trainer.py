@@ -62,8 +62,6 @@ class MABLMTrainer(Trainer):
 
         logger.setLevel(logging.INFO)
 
-        self.action2count = collections.defaultdict(int)
-
         if args is None:
             output_dir = "tmp_trainer"
             logger.info(f"No `TrainingArguments` passed, using `output_dir={output_dir}`.")
@@ -495,9 +493,6 @@ class MABLMTrainer(Trainer):
 
                 if (step + 1) % self.args.gradient_accumulation_steps == 0:
 
-                    if (step + 1) % self.args.logging_steps == 0:
-                        logger.info(f"action count - {self.action2count}")
-
                     # Gradient clipping
                     if self.args.max_grad_norm is not None and self.args.max_grad_norm > 0 and not self.deepspeed:
                         # deepspeed does its own clipping
@@ -536,6 +531,15 @@ class MABLMTrainer(Trainer):
                     cur_eval_loss = metrics['eval_loss']
                     self.reward = - (cur_eval_loss - self.last_eval_loss)
                     self.update_weights(action)
+                    self.last_eval_loss = cur_eval_loss
+
+                    if (step + 1) % self.args.logging_steps == 0:
+                        logs = {}
+                        weights = self.weights.tolist()
+                        for i in range(self.num_groups):
+                            logs[f"weight_train_{i}"] = weights[i]
+                        logs["reward"] = self.reward
+                        self.log(logs)
 
                     self._maybe_log_save_evaluate(tr_loss, model, trial, step)
 
@@ -597,9 +601,25 @@ class MABLMTrainer(Trainer):
 
 
 class MABLMTrainerNaive(MABLMTrainer):
+    def __init__(
+            self,
+            model: Union[PreTrainedModel, torch.nn.Module] = None,
+            args: TrainingArguments = None,
+            data_collator: Optional[DataCollator] = None,
+            train_datasets: Optional[List[Dataset]] = None,
+            eval_dataset: Optional[Dataset] = None,
+            tokenizer: Optional["PreTrainedTokenizerBase"] = None,
+            model_init: Callable[[], PreTrainedModel] = None,
+            compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+            callbacks: Optional[List[TrainerCallback]] = None,
+            optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
+            num_groups: int = None
+    ):
+        super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, num_groups)
+        self.weights = np.ones(self.num_groups) / self.num_groups
+
     def get_action(self):
         action = randrange(self.num_groups)
-        self.action2count[action] += 1
         return action
 
 
@@ -632,4 +652,3 @@ class MABLMTrainerExp3(MABLMTrainer):
         probs = (1 - self.gamma) * self.weights / np.sum(self.weights) + self.gamma / self.num_groups
         estimated_reward = reward / probs[action]
         self.weights[action] = self.weights[action] * np.exp(self.gamma * estimated_reward / self.num_groups)
-        logger.info(f" Weights: {self.weights}")
