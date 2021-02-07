@@ -213,6 +213,7 @@ class MABLMTrainer(Trainer):
 
         self.last_eval_loss = None
         self.reward = None
+        self.action2count = collections.defaultdict(int)
 
     def _get_train_samplers(self) -> Optional[List[torch.utils.data.sampler.Sampler]]:
         if isinstance(self.train_datasets[0], torch.utils.data.IterableDataset) or not isinstance(
@@ -472,6 +473,7 @@ class MABLMTrainer(Trainer):
 
             for step in range(max_steps):
                 action = self.get_action()
+                self.action2count[action] += 1
                 cur_dataloader = train_dataloaders[action]
                 # TODO make sure this is OK
                 inputs = next(iter(cur_dataloader))
@@ -538,6 +540,7 @@ class MABLMTrainer(Trainer):
                         probs = self.weights_to_prob().tolist()
                         for i in range(self.num_groups):
                             logs[f"prob_train_{i}"] = probs[i]
+                            logs[f"count_train_{i}"] = self.action2count[i]
                         logs["reward"] = self.reward
                         self.log(logs)
 
