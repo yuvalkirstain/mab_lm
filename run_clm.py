@@ -25,6 +25,7 @@ import math
 import os
 import sys
 from dataclasses import dataclass, field
+from glob import glob
 from typing import Optional
 
 from datasets import load_dataset
@@ -44,6 +45,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
+from mab_lm_trainer import MABLMTrainer
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +135,13 @@ class DataTrainingArguments:
         default=None,
         metadata={"help": "The number of processes to use for the preprocessing."},
     )
+    num_groups: int = field(
+        default=1,
+        metadata={"help": "The number of data groups for training."},
+    )
+
+    # num_groups: int = field()
+    # scoring_function: Literal["exp3", "uniform"] = "exp3"
 
     def __post_init__(self):
         if self.dataset_name is None and self.train_file is None and self.validation_file is None:
@@ -206,6 +215,7 @@ def main():
     #
     # In distributed training, the load_dataset function guarantee that only one local process can concurrently
     # download the dataset.
+    # TODO make adaptable to number of groups
     if data_args.dataset_name is not None:
         # Downloading and loading a dataset from the hub.
         datasets = load_dataset(data_args.dataset_name, data_args.dataset_config_name)
@@ -222,8 +232,11 @@ def main():
             )
     else:
         data_files = {}
-        if data_args.train_file is not None:
-            data_files["train"] = data_args.train_file
+        train_files = glob(data_args.train_file)
+        assert len(train_files) == data_args.num_groups, "The number of groups argument needs to be equal to the number of train files."
+        for i, path in enumerate(train_files):
+            if data_args.train_file is not None:
+                data_files[f"train_{i}"] = path
         if data_args.validation_file is not None:
             data_files["validation"] = data_args.validation_file
         extension = data_args.train_file.split(".")[-1]
@@ -286,7 +299,7 @@ def main():
     # Preprocessing the datasets.
     # First we tokenize all the texts.
     if training_args.do_train:
-        column_names = datasets["train"].column_names
+        column_names = datasets["train_0"].column_names
     else:
         column_names = datasets["validation"].column_names
     text_column_name = "text" if "text" in column_names else column_names[0]
@@ -348,15 +361,24 @@ def main():
     )
 
     # Initialize our Trainer
-    trainer = Trainer(
+    trainer = MABLMTrainer(
         model=model,
         args=training_args,
-        train_dataset=lm_datasets["train"] if training_args.do_train else None,
+        train_datasets=[lm_datasets[f"train_{i}"] for i in range(data_args.num_groups)] if training_args.do_train else None,
         eval_dataset=lm_datasets["validation"] if training_args.do_eval else None,
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.
         data_collator=default_data_collator,
     )
+    # trainer = Trainer(
+    #     model=model,
+    #     args=training_args,
+    #     train_dataset=lm_datasets["train_0"] if training_args.do_train else None,
+    #     eval_dataset=lm_datasets["validation"] if training_args.do_eval else None,
+    #     tokenizer=tokenizer,
+    #     # Data collator will default to DataCollatorWithPadding, so we change it.
+    #     data_collator=default_data_collator,
+    # )
 
     # Training
     if training_args.do_train:
