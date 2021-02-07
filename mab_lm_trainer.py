@@ -535,9 +535,9 @@ class MABLMTrainer(Trainer):
 
                     if (step + 1) % self.args.logging_steps == 0:
                         logs = {}
-                        weights = self.weights.tolist()
+                        probs = self.weights_to_prob().tolist()
                         for i in range(self.num_groups):
-                            logs[f"weight_train_{i}"] = weights[i]
+                            logs[f"prob_train_{i}"] = probs[i]
                         logs["reward"] = self.reward
                         self.log(logs)
 
@@ -636,7 +636,7 @@ class MABLMTrainerExp3(MABLMTrainer):
             compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
             callbacks: Optional[List[TrainerCallback]] = None,
             optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
-            num_groups: int = None
+            num_groups: int = None,
     ):
         super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, num_groups)
         self.weights = np.ones(self.num_groups)
@@ -647,8 +647,11 @@ class MABLMTrainerExp3(MABLMTrainer):
         action = np.random.choice(np.arange(self.num_groups), 1, p=probs).tolist()[0]
         return action
 
+    def weights_to_prob(self):
+        return (1 - self.gamma) * self.weights / np.sum(self.weights) + self.gamma / self.num_groups
+
     def update_weights(self, action):
         reward = self.reward
-        probs = (1 - self.gamma) * self.weights / np.sum(self.weights) + self.gamma / self.num_groups
+        probs = self.weights_to_prob()
         estimated_reward = reward / probs[action]
         self.weights[action] = self.weights[action] * np.exp(self.gamma * estimated_reward / self.num_groups)
