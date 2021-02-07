@@ -3,7 +3,7 @@ import math
 import os
 import warnings
 import time
-from random import randrange
+from random import randrange, random
 from typing import Optional, Union, Dict, Any, Callable, List, Tuple
 
 import datasets
@@ -37,24 +37,29 @@ if is_sagemaker_distributed_available():
 else:
     import torch.distributed as dist
 
+import numpy as np
+
 logger = logging.get_logger(__name__)
 
 
 class MABLMTrainer(Trainer):
     # we want to have a dataloader for each group of actions
     def __init__(
-        self,
-        model: Union[PreTrainedModel, torch.nn.Module] = None,
-        args: TrainingArguments = None,
-        data_collator: Optional[DataCollator] = None,
-        train_datasets: Optional[List[Dataset]] = None,
-        eval_dataset: Optional[Dataset] = None,
-        tokenizer: Optional["PreTrainedTokenizerBase"] = None,
-        model_init: Callable[[], PreTrainedModel] = None,
-        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
-        callbacks: Optional[List[TrainerCallback]] = None,
-        optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
+            self,
+            model: Union[PreTrainedModel, torch.nn.Module] = None,
+            args: TrainingArguments = None,
+            data_collator: Optional[DataCollator] = None,
+            train_datasets: Optional[List[Dataset]] = None,
+            eval_dataset: Optional[Dataset] = None,
+            tokenizer: Optional["PreTrainedTokenizerBase"] = None,
+            model_init: Callable[[], PreTrainedModel] = None,
+            compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+            callbacks: Optional[List[TrainerCallback]] = None,
+            optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
+            num_groups: int = None,
     ):
+        self.num_groups = num_groups
+
         logger.setLevel(logging.INFO)
 
         self.action2count = collections.defaultdict(int)
@@ -208,9 +213,12 @@ class MABLMTrainer(Trainer):
         self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
 
+        self.last_eval_loss = None
+        self.reward = None
+
     def _get_train_samplers(self) -> Optional[List[torch.utils.data.sampler.Sampler]]:
         if isinstance(self.train_datasets[0], torch.utils.data.IterableDataset) or not isinstance(
-            self.train_datasets[0], collections.abc.Sized
+                self.train_datasets[0], collections.abc.Sized
         ):
             return None
 
@@ -219,8 +227,8 @@ class MABLMTrainer(Trainer):
             num_processes = xm.xrt_world_size()
             process_index = xm.get_ordinal()
         elif (
-            self.args.parallel_mode == ParallelMode.DISTRIBUTED
-            or self.args.parallel_mode == ParallelMode.SAGEMAKER_DISTRIBUTED
+                self.args.parallel_mode == ParallelMode.DISTRIBUTED
+                or self.args.parallel_mode == ParallelMode.SAGEMAKER_DISTRIBUTED
         ):
             num_processes = dist.get_world_size()
             process_index = dist.get_rank()
@@ -267,10 +275,10 @@ class MABLMTrainer(Trainer):
         ) for train_dataset, train_sampler in zip(self.train_datasets, train_samplers)]
 
     def train(
-        self,
-        resume_from_checkpoint: Optional[str] = None,
-        trial: Union["optuna.Trial", Dict[str, Any]] = None,
-        **kwargs,
+            self,
+            resume_from_checkpoint: Optional[str] = None,
+            trial: Union["optuna.Trial", Dict[str, Any]] = None,
+            **kwargs,
     ):
         """
         Main training entry point.
@@ -461,6 +469,9 @@ class MABLMTrainer(Trainer):
 
             self.control = self.callback_handler.on_epoch_begin(self.args, self.state, self.control)
 
+            metrics = self.evaluate()
+            self.last_eval_loss = metrics['eval_loss']
+
             for step in range(max_steps):
                 action = self.get_action()
                 cur_dataloader = train_dataloaders[action]
@@ -483,6 +494,10 @@ class MABLMTrainer(Trainer):
                 self._total_flos += self.floating_point_ops(inputs)
 
                 if (step + 1) % self.args.gradient_accumulation_steps == 0:
+
+                    if (step + 1) % self.args.logging_steps == 0:
+                        logger.info(f"action count - {self.action2count}")
+
                     # Gradient clipping
                     if self.args.max_grad_norm is not None and self.args.max_grad_norm > 0 and not self.deepspeed:
                         # deepspeed does its own clipping
@@ -516,6 +531,11 @@ class MABLMTrainer(Trainer):
                     model.zero_grad()
                     self.state.global_step += 1
                     self.control = self.callback_handler.on_step_end(self.args, self.state, self.control)
+
+                    metrics = self.evaluate()
+                    cur_eval_loss = metrics['eval_loss']
+                    self.reward = - (cur_eval_loss - self.last_eval_loss)
+                    self.update_weights(action)
 
                     self._maybe_log_save_evaluate(tr_loss, model, trial, step)
 
@@ -570,7 +590,46 @@ class MABLMTrainer(Trainer):
         return TrainOutput(self.state.global_step, self._total_loss_scalar / self.state.global_step, metrics)
 
     def get_action(self):
-        action = randrange(len(self.train_datasets))
+        pass
+
+    def update_weights(self, action):
+        pass
+
+
+class MABLMTrainerNaive(MABLMTrainer):
+    def get_action(self):
+        action = randrange(self.num_groups)
         self.action2count[action] += 1
         return action
 
+
+class MABLMTrainerExp3(MABLMTrainer):
+    def __init__(
+            self,
+            model: Union[PreTrainedModel, torch.nn.Module] = None,
+            args: TrainingArguments = None,
+            data_collator: Optional[DataCollator] = None,
+            train_datasets: Optional[List[Dataset]] = None,
+            eval_dataset: Optional[Dataset] = None,
+            tokenizer: Optional["PreTrainedTokenizerBase"] = None,
+            model_init: Callable[[], PreTrainedModel] = None,
+            compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+            callbacks: Optional[List[TrainerCallback]] = None,
+            optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
+            num_groups: int = None
+    ):
+        super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, num_groups)
+        self.weights = np.ones(self.num_groups)
+        self.gamma = 0.15
+
+    def get_action(self):
+        probs = (1 - self.gamma) * self.weights / np.sum(self.weights) + self.gamma / self.num_groups
+        action = np.random.choice(np.arange(self.num_groups), 1, p=probs).tolist()[0]
+        return action
+
+    def update_weights(self, action):
+        reward = self.reward
+        probs = (1 - self.gamma) * self.weights / np.sum(self.weights) + self.gamma / self.num_groups
+        estimated_reward = reward / probs[action]
+        self.weights[action] = self.weights[action] * np.exp(self.gamma * estimated_reward / self.num_groups)
+        logger.info(f" Weights: {self.weights}")

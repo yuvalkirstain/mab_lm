@@ -45,7 +45,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
-from mab_lm_trainer import MABLMTrainer
+from mab_lm_trainer import MABLMTrainer, MABLMTrainerExp3, MABLMTrainerNaive
 
 logger = logging.getLogger(__name__)
 
@@ -139,9 +139,10 @@ class DataTrainingArguments:
         default=1,
         metadata={"help": "The number of data groups for training."},
     )
-
-    # num_groups: int = field()
-    # scoring_function: Literal["exp3", "uniform"] = "exp3"
+    scoring_function: str = field(
+        default=None,
+        metadata={"help": "exp3 or uniform"},
+    )
 
     def __post_init__(self):
         if self.dataset_name is None and self.train_file is None and self.validation_file is None:
@@ -153,6 +154,8 @@ class DataTrainingArguments:
             if self.validation_file is not None:
                 extension = self.validation_file.split(".")[-1]
                 assert extension in ["csv", "json", "txt"], "`validation_file` should be a csv, a json or a txt file."
+
+        assert self.scoring_function in ["exp3", "uniform"], "scoring_function should be exp3 or uniform"
 
 
 def main():
@@ -361,7 +364,8 @@ def main():
     )
 
     # Initialize our Trainer
-    trainer = MABLMTrainer(
+    trainer_cls = MABLMTrainerExp3 if data_args.scoring_function == "exp3" else MABLMTrainerNaive
+    trainer = trainer_cls(
         model=model,
         args=training_args,
         train_datasets=[lm_datasets[f"train_{i}"] for i in range(data_args.num_groups)] if training_args.do_train else None,
@@ -369,6 +373,7 @@ def main():
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.
         data_collator=default_data_collator,
+        num_groups=data_args.num_groups
     )
     # trainer = Trainer(
     #     model=model,
