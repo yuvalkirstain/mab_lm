@@ -143,6 +143,14 @@ class DataTrainingArguments:
         default=None,
         metadata={"help": "exp3 or uniform"},
     )
+    num_eval_batches_for_reward: int = field(
+        default=1,
+        metadata={"help": "The number of forward passes we make each time we get a reward."},
+    )
+    steps_per_reward: int = field(
+        default=1,
+        metadata={"help": "The number of forward passes we do for each action."},
+    )
 
     def __post_init__(self):
         if self.dataset_name is None and self.train_file is None and self.validation_file is None:
@@ -374,7 +382,9 @@ def main():
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.
         data_collator=default_data_collator,
-        num_groups=data_args.num_groups
+        num_groups=data_args.num_groups,
+        num_eval_batches_for_reward=data_args.num_eval_batches_for_reward,
+        steps_per_reward=data_args.steps_per_reward
     )
     # trainer = Trainer(
     #     model=model,

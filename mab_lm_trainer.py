@@ -57,8 +57,9 @@ class MABLMTrainer(Trainer):
             callbacks: Optional[List[TrainerCallback]] = None,
             optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
             num_groups: int = None,
+            num_eval_batches_for_reward: int = None,
+            steps_per_reward: int = None,
     ):
-        self.num_groups = num_groups
 
         logger.setLevel(logging.INFO)
 
@@ -214,6 +215,10 @@ class MABLMTrainer(Trainer):
         self.last_eval_loss = None
         self.reward = None
         self.action2count = collections.defaultdict(int)
+        self.num_groups = num_groups
+        self.eval_dataloader = self.get_eval_dataloader()
+        self.num_eval_batches_for_reward = num_eval_batches_for_reward
+        self.steps_per_reward = steps_per_reward
 
     def _get_train_samplers(self) -> Optional[List[torch.utils.data.sampler.Sampler]]:
         if isinstance(self.train_datasets[0], torch.utils.data.IterableDataset) or not isinstance(
@@ -468,13 +473,13 @@ class MABLMTrainer(Trainer):
 
             self.control = self.callback_handler.on_epoch_begin(self.args, self.state, self.control)
 
-            metrics = self.evaluate()
-            self.last_eval_loss = metrics['eval_loss']
+            self.last_eval_loss = self.get_approximated_eval_loss(model)
 
+            action = self.get_action()
+            cur_dataloader = train_dataloaders[action]
             for step in range(max_steps):
-                action = self.get_action()
+
                 self.action2count[action] += 1
-                cur_dataloader = train_dataloaders[action]
                 # TODO make sure this is OK
                 inputs = next(iter(cur_dataloader))
                 # Skip past any already trained steps if resuming training
@@ -529,13 +534,15 @@ class MABLMTrainer(Trainer):
                     self.state.global_step += 1
                     self.control = self.callback_handler.on_step_end(self.args, self.state, self.control)
 
-                    metrics = self.evaluate()
-                    cur_eval_loss = metrics['eval_loss']
-                    self.reward = - (cur_eval_loss - self.last_eval_loss)
-                    self.update_weights(action)
-                    self.last_eval_loss = cur_eval_loss
+                    if (step + 1) % self.steps_per_reward == 0:
+                        cur_eval_loss = self.get_approximated_eval_loss(model)
+                        self.reward = - (cur_eval_loss - self.last_eval_loss)
+                        self.update_weights(action)
+                        self.last_eval_loss = cur_eval_loss
+                        action = self.get_action()
+                        cur_dataloader = train_dataloaders[action]
 
-                    if (step + 1) % self.args.logging_steps == 0:
+                    if (step + 1) % self.args.logging_steps == 0 and self.reward is not None:
                         logs = {}
                         probs = self.weights_to_prob().tolist()
                         for i in range(self.num_groups):
@@ -602,6 +609,17 @@ class MABLMTrainer(Trainer):
     def update_weights(self, action):
         pass
 
+    def get_approximated_eval_loss(self, model):
+        batch_size = self.eval_dataloader.batch_size
+        losses_host = None
+        for _ in range(self.num_eval_batches_for_reward):
+            inputs = next(iter(self.eval_dataloader))
+            loss, _, _ = self.prediction_step(model, inputs, prediction_loss_only=True)
+            if loss is not None:
+                losses = loss.repeat(batch_size)
+                losses_host = losses if losses_host is None else torch.cat((losses_host, losses), dim=0)
+        return losses_host.mean().item()
+
 
 class MABLMTrainerNaive(MABLMTrainer):
     def __init__(
@@ -640,8 +658,10 @@ class MABLMTrainerExp3(MABLMTrainer):
             callbacks: Optional[List[TrainerCallback]] = None,
             optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
             num_groups: int = None,
+            num_eval_batches_for_reward: int = None,
+            steps_per_reward: int = None,
     ):
-        super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, num_groups)
+        super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, num_groups, num_eval_batches_for_reward, steps_per_reward)
         self.weights = np.ones(self.num_groups)
         self.gamma = 0.15
 
