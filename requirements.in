@@ -1,4 +1,5 @@
 torch
-transformers
+transformers  # may need to install from source
 datasets
 wptools
+wandb
