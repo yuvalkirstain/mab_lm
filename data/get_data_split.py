@@ -12,38 +12,57 @@ def main(args):
         train_lines = [line for line in fd.readlines()]
     with open(args.valid_data_file, "r", encoding='utf8') as fd:
         valid_lines = [line for line in fd.readlines()]
+    with open(args.test_data_file, "r", encoding='utf8') as fd:
+        test_lines = [line for line in fd.readlines()]
 
     # load wiki info
     with open(args.train_wiki_info, "r", encoding='utf8') as fd:
         train_info = json.load(fd)
     with open(args.valid_wiki_info, "r", encoding='utf8') as fd:
         valid_info = json.load(fd)
+    with open(args.test_wiki_info, "r", encoding='utf8') as fd:
+        test_info = json.load(fd)
 
     # create new data split
     new_train_lines = []
     new_valid_lines = []
+    new_test_lines = []
     train_page_count = 0
     valid_page_count = 0
-    for split_lines, split_info in zip([train_lines, valid_lines], [train_info, valid_info]):
+    test_page_count = 0
+    for split_lines, split_info, split_name in \
+            zip([train_lines, valid_lines, test_lines],
+                [train_info, valid_info, test_info],
+                ["train", "valid", "test"]):
         for title, info in tqdm(split_info.items()):
-            if "what" in info and info["what"] == args.split_what:
+            # dev set includes only in-domain test examples.
+            if split_name == "valid" and "what" in info and info["what"] == args.split_what:
                 for line_idx in range(info["start_line_idx"], info["end_line_idx"]+1):
                     new_valid_lines.append(split_lines[line_idx])
                 valid_page_count += 1
-            else:
+            # test set includes only in-domain test examples.
+            elif split_name == "test" and "what" in info and info["what"] == args.split_what:
+                for line_idx in range(info["start_line_idx"], info["end_line_idx"]+1):
+                    new_test_lines.append(split_lines[line_idx])
+                test_page_count += 1
+
+            # train set includes out-of-domain train and dev examples + in-domain train examples.
+            elif split_name in ["train", "valid"]:
                 for line_idx in range(info["start_line_idx"], info["end_line_idx"]+1):
                     new_train_lines.append(split_lines[line_idx])
                 train_page_count += 1
 
     print(f"created a data split for '{args.split_what}': "
-          f"train pages {train_page_count}, valid pages {valid_page_count}, "
-          f"train lines {len(new_train_lines)}, valid lines {len(new_valid_lines)}.")
+          f"train pages {train_page_count}, valid pages {valid_page_count}, test pages {test_page_count}, "
+          f"train lines {len(new_train_lines)}, valid lines {len(new_valid_lines)}, test lines {len(new_test_lines)}.")
 
     # write data files
     with open(os.path.join(args.output_dir, f"wiki-{args.split_what}.train.tokens"), "w", encoding='utf8') as fd:
         fd.writelines(new_train_lines)
     with open(os.path.join(args.output_dir, f"wiki-{args.split_what}.valid.tokens"), "w", encoding='utf8') as fd:
         fd.writelines(new_valid_lines)
+    with open(os.path.join(args.output_dir, f"wiki-{args.split_what}.test.tokens"), "w", encoding='utf8') as fd:
+        fd.writelines(new_test_lines)
 
 
 if __name__ == '__main__':
@@ -54,10 +73,15 @@ if __name__ == '__main__':
                         help='path to validation set wiki info')
     parser.add_argument('--valid_wiki_info', type=str, default='raw_data/wikitext-103/wiki.valid.tokens.title_map.wiki_info',
                         help='path to validation set wiki info')
+    parser.add_argument('--test_wiki_info', type=str,
+                        default='raw_data/wikitext-103/wiki.test.tokens.title_map.wiki_info',
+                        help='path to test set wiki info')
     parser.add_argument('--train_data_file', type=str, default='raw_data/wikitext-103/wiki.train.tokens',
                         help='path to the original training set')
     parser.add_argument('--valid_data_file', type=str, default='raw_data/wikitext-103/wiki.valid.tokens',
                         help='path to the original validation set')
+    parser.add_argument('--test_data_file', type=str, default='raw_data/wikitext-103/wiki.test.tokens',
+                        help='path to the original test set')
     parser.add_argument('--output_dir', type=str, default='raw_data/wikitext-103',
                         help='path to output dir')
     args = parser.parse_args()
