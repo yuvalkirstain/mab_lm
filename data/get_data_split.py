@@ -44,10 +44,10 @@ def main(args):
                 out_domain_page_count += 1
 
         # write data files
-        with open(os.path.join(args.output_dir, f"wiki-{args.split_what}-in-domain.{split_name}.tokens"), "w",
+        with open(os.path.join(args.output_dir, f"wiki-{'+'.join(args.split_what)}-in-domain.{split_name}.tokens"), "w",
                   encoding='utf8') as fd:
             fd.writelines(in_domain_lines)
-        with open(os.path.join(args.output_dir, f"wiki-{args.split_what}-out-domain.{split_name}.tokens"), "w",
+        with open(os.path.join(args.output_dir, f"wiki-{'+'.join(args.split_what)}-out-domain.{split_name}.tokens"), "w",
                   encoding='utf8') as fd:
             fd.writelines(out_domain_lines)
 
