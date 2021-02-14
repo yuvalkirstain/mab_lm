@@ -397,7 +397,9 @@ def main():
             tokenizer=tokenizer,
             # Data collator will default to DataCollatorWithPadding, so we change it.
             data_collator=default_data_collator,
-            num_groups=data_args.num_groups
+            num_groups=data_args.num_groups,
+            num_eval_batches_for_reward=1,
+            steps_per_reward=100000000
         )
 
     # trainer = Trainer(
