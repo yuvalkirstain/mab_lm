@@ -396,7 +396,8 @@ def main():
             eval_dataset=lm_datasets["validation"] if training_args.do_eval else None,
             tokenizer=tokenizer,
             # Data collator will default to DataCollatorWithPadding, so we change it.
-            data_collator=default_data_collator
+            data_collator=default_data_collator,
+            num_groups=data_args.num_groups
         )
 
     # trainer = Trainer(
