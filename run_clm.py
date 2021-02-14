@@ -373,19 +373,32 @@ def main():
     )
 
     # Initialize our Trainer
-    trainer_cls = MABLMTrainerExp3 if data_args.scoring_function == "exp3" else MABLMTrainerNaive
-    trainer = trainer_cls(
-        model=model,
-        args=training_args,
-        train_datasets=[lm_datasets[f"train_{i}"] for i in range(data_args.num_groups)] if training_args.do_train else None,
-        eval_dataset=lm_datasets["validation"] if training_args.do_eval else None,
-        tokenizer=tokenizer,
-        # Data collator will default to DataCollatorWithPadding, so we change it.
-        data_collator=default_data_collator,
-        num_groups=data_args.num_groups,
-        num_eval_batches_for_reward=data_args.num_eval_batches_for_reward,
-        steps_per_reward=data_args.steps_per_reward
-    )
+    if data_args.scoring_function == "exp3":
+        trainer = MABLMTrainerExp3(
+            model=model,
+            args=training_args,
+            train_datasets=[lm_datasets[f"train_{i}"] for i in
+                            range(data_args.num_groups)] if training_args.do_train else None,
+            eval_dataset=lm_datasets["validation"] if training_args.do_eval else None,
+            tokenizer=tokenizer,
+            # Data collator will default to DataCollatorWithPadding, so we change it.
+            data_collator=default_data_collator,
+            num_groups=data_args.num_groups,
+            num_eval_batches_for_reward=data_args.num_eval_batches_for_reward,
+            steps_per_reward=data_args.steps_per_reward
+        )
+    else:
+        trainer = MABLMTrainerNaive(
+            model=model,
+            args=training_args,
+            train_datasets=[lm_datasets[f"train_{i}"] for i in
+                            range(data_args.num_groups)] if training_args.do_train else None,
+            eval_dataset=lm_datasets["validation"] if training_args.do_eval else None,
+            tokenizer=tokenizer,
+            # Data collator will default to DataCollatorWithPadding, so we change it.
+            data_collator=default_data_collator
+        )
+
     # trainer = Trainer(
     #     model=model,
     #     args=training_args,
