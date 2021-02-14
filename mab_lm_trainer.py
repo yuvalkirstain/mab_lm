@@ -634,9 +634,11 @@ class MABLMTrainerNaive(MABLMTrainer):
             compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
             callbacks: Optional[List[TrainerCallback]] = None,
             optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
-            num_groups: int = None
+            num_groups: int = None,
+            num_eval_batches_for_reward: int = 1,
+            steps_per_reward: int = 10000000
     ):
-        super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, num_groups)
+        super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, num_groups, num_eval_batches_for_reward, steps_per_reward)
         self.weights = np.ones(self.num_groups) / self.num_groups
 
     def get_action(self):
