@@ -34,7 +34,7 @@ def main(args):
         out_domain_page_count = 0
 
         for title, info in tqdm(split_info.items()):
-            if "what" in info and info["what"] == args.split_what:
+            if "what" in info and info["what"] in args.split_what:
                 for line_idx in range(info["start_line_idx"], info["end_line_idx"]+1):
                     in_domain_lines.append(split_lines[line_idx])
                 in_domain_page_count += 1
@@ -58,7 +58,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('split_what', type=str, default='',
+    parser.add_argument('split_what', nargs='+',
                         help='value of "what" property based on which the data split will be created.')
     parser.add_argument('--train_wiki_info', type=str, default='raw_data/wikitext-103/wiki.train.tokens.title_map.wiki_info',
                         help='path to validation set wiki info')
