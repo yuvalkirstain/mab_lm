@@ -221,7 +221,7 @@ class MABLMTrainer(Trainer):
         self.num_eval_batches_for_reward = num_eval_batches_for_reward
         self.steps_per_reward = steps_per_reward
         self.sigmoid_normalize = sigmoid_normalize
-        self.action = None
+        self.action = 0
         self.cur_dataloader = None
         self.train_dataloaders = None
 
@@ -471,7 +471,7 @@ class MABLMTrainer(Trainer):
             self.control = self.callback_handler.on_epoch_begin(self.args, self.state, self.control)
 
             self.last_eval_loss = self.get_cur_eval_loss(model)
-            self.cur_dataloader = self.train_dataloaders[0]
+            self.cur_dataloader = self.train_dataloaders[self.action]
 
             for step in range(max_steps):
 
