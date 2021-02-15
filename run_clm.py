@@ -151,6 +151,10 @@ class DataTrainingArguments:
         default=1,
         metadata={"help": "The number of forward passes we do for each action."},
     )
+    gamma: float = field(
+        default=None,
+        metadata={"help": "The gamma value for EXP3 algorithm."},
+    )
 
     def __post_init__(self):
         if self.dataset_name is None and self.train_file is None and self.validation_file is None:
@@ -385,7 +389,8 @@ def main():
             data_collator=default_data_collator,
             num_groups=data_args.num_groups,
             num_eval_batches_for_reward=data_args.num_eval_batches_for_reward,
-            steps_per_reward=data_args.steps_per_reward
+            steps_per_reward=data_args.steps_per_reward,
+            gamma=data_args.gamma
         )
     else:
         trainer = MABLMTrainerNaive(

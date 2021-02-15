@@ -662,10 +662,11 @@ class MABLMTrainerExp3(MABLMTrainer):
             num_groups: int = None,
             num_eval_batches_for_reward: int = None,
             steps_per_reward: int = None,
+            gamma: float = None,
     ):
         super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, num_groups, num_eval_batches_for_reward, steps_per_reward)
         self.weights = np.ones(self.num_groups)
-        self.gamma = np.sqrt(np.log(num_groups) / num_groups)
+        self.gamma = np.sqrt(np.log(num_groups) / num_groups) if gamma is None else gamma
 
     def get_action(self):
         probs = (1 - self.gamma) * self.weights / np.sum(self.weights) + self.gamma / self.num_groups
