@@ -155,6 +155,10 @@ class DataTrainingArguments:
         default=None,
         metadata={"help": "The gamma value for EXP3 algorithm."},
     )
+    sigmoid_normalize: bool = field(
+        default=False,
+        metadata={"help": "Normalize rewards using sigmoid for EXP3 algorithm."},
+    )
 
     def __post_init__(self):
         if self.dataset_name is None and self.train_file is None and self.validation_file is None:
@@ -390,7 +394,8 @@ def main():
             num_groups=data_args.num_groups,
             num_eval_batches_for_reward=data_args.num_eval_batches_for_reward,
             steps_per_reward=data_args.steps_per_reward,
-            gamma=data_args.gamma
+            gamma=data_args.gamma,
+            sigmoid_normalize=data_args.sigmoid_normalize,
         )
     else:
         trainer = MABLMTrainerNaive(

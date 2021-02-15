@@ -59,6 +59,7 @@ class MABLMTrainer(Trainer):
             num_groups: int = None,
             num_eval_batches_for_reward: int = None,
             steps_per_reward: int = None,
+            sigmoid_normalize: bool = False
     ):
 
         logger.setLevel(logging.INFO)
@@ -219,6 +220,10 @@ class MABLMTrainer(Trainer):
         self.eval_dataloader = self.get_eval_dataloader()
         self.num_eval_batches_for_reward = num_eval_batches_for_reward
         self.steps_per_reward = steps_per_reward
+        self.sigmoid_normalize = sigmoid_normalize
+        self.action = None
+        self.cur_dataloader = None
+        self.train_dataloaders = None
 
     def _get_train_samplers(self) -> Optional[List[torch.utils.data.sampler.Sampler]]:
         if isinstance(self.train_datasets[0], torch.utils.data.IterableDataset) or not isinstance(
@@ -255,20 +260,12 @@ class MABLMTrainer(Trainer):
             else:
                 return [DistributedSampler(train_dataset, num_replicas=num_processes, rank=process_index) for train_dataset in self.train_datasets]
 
-    def get_train_dataloaders(self) -> List[DataLoader]:
-        """
-        Returns the training :class:`~torch.utils.data.DataLoader`.
-
-        Will use no sampler if :obj:`self.train_dataset` does not implement :obj:`__len__`, a random sampler (adapted
-        to distributed training if necessary) otherwise.
-
-        Subclass and override this method if you want to inject some custom behavior.
-        """
+    def set_train_dataloaders(self):
         if self.train_datasets is None:
             raise ValueError("Trainer: training requires a train_dataset.")
         train_samplers = self._get_train_samplers()
 
-        return [DataLoader(
+        self.train_dataloaders= [DataLoader(
             train_dataset,
             batch_size=self.args.train_batch_size,
             sampler=train_sampler,
@@ -338,14 +335,14 @@ class MABLMTrainer(Trainer):
         train_dataset_is_sized = isinstance(self.train_datasets[0], collections.abc.Sized)
 
         # Data loader and number of training steps
-        train_dataloaders = self.get_train_dataloaders()
+        self.set_train_dataloaders()
 
         # Setting up training control variables:
         # number of training epochs: num_train_epochs
         # number of training steps per epoch: num_update_steps_per_epoch
         # total number of training steps to execute: max_steps
         if train_dataset_is_sized:
-            num_update_steps_per_epoch = sum(len(train_dataloader) for train_dataloader in train_dataloaders) // self.args.gradient_accumulation_steps
+            num_update_steps_per_epoch = sum(len(train_dataloader) for train_dataloader in self.train_dataloaders) // self.args.gradient_accumulation_steps
             num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
             if self.args.max_steps > 0:
                 max_steps = self.args.max_steps
@@ -423,7 +420,7 @@ class MABLMTrainer(Trainer):
             self.num_examples(train_dataloader)
             if train_dataset_is_sized
             else total_train_batch_size * self.args.max_steps
-        ) for train_dataloader in train_dataloaders]
+        ) for train_dataloader in self.train_dataloaders]
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples per group = {num_examples_per_group}")
@@ -441,7 +438,7 @@ class MABLMTrainer(Trainer):
         self.callback_handler.model = self.model
         self.callback_handler.optimizer = self.optimizer
         self.callback_handler.lr_scheduler = self.lr_scheduler
-        self.callback_handler.train_dataloader = train_dataloaders[0]
+        self.callback_handler.train_dataloader = self.train_dataloaders[0]
         self.state.trial_name = self.hp_name(trial) if self.hp_name is not None else None
         self.state.trial_params = hp_params(trial) if trial is not None else None
         # This should be the same if the state has been saved but in case the training arguments changed, it's safer
@@ -463,7 +460,7 @@ class MABLMTrainer(Trainer):
         # Skip the first epochs_trained epochs to get the random state of the dataloader at the right point.
         if not self.args.ignore_data_skip:
 
-            for train_dataloader in train_dataloaders:
+            for train_dataloader in self.train_dataloaders:
                 if isinstance(train_dataloader, DataLoader) and isinstance(train_dataloader.sampler, DistributedSampler):
                     train_dataloader.sampler.set_epoch(0)
 
@@ -473,15 +470,14 @@ class MABLMTrainer(Trainer):
 
             self.control = self.callback_handler.on_epoch_begin(self.args, self.state, self.control)
 
-            self.last_eval_loss = self.get_approximated_eval_loss(model)
+            self.last_eval_loss = self.get_cur_eval_loss(model)
+            self.cur_dataloader = self.train_dataloaders[0]
 
-            action = self.get_action()
-            cur_dataloader = train_dataloaders[action]
             for step in range(max_steps):
 
-                self.action2count[action] += 1
+                self.action2count[self.action] += 1
                 # TODO make sure this is OK
-                inputs = next(iter(cur_dataloader))
+                inputs = next(iter(self.cur_dataloader))
                 # Skip past any already trained steps if resuming training
                 if steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
@@ -535,12 +531,7 @@ class MABLMTrainer(Trainer):
                     self.control = self.callback_handler.on_step_end(self.args, self.state, self.control)
 
                     if (step + 1) % self.steps_per_reward == 0:
-                        cur_eval_loss = self.get_approximated_eval_loss(model)
-                        self.reward = - (cur_eval_loss - self.last_eval_loss)
-                        self.update_weights(action)
-                        self.last_eval_loss = cur_eval_loss
-                        action = self.get_action()
-                        cur_dataloader = train_dataloaders[action]
+                        self.update(model)
 
                     if (step + 1) % self.args.logging_steps == 0 and self.reward is not None:
                         logs = {}
@@ -603,13 +594,24 @@ class MABLMTrainer(Trainer):
 
         return TrainOutput(self.state.global_step, self._total_loss_scalar / self.state.global_step, metrics)
 
-    def get_action(self):
+    def set_action(self):
         pass
 
-    def update_weights(self, action):
+    def update_weights(self):
         pass
 
-    def get_approximated_eval_loss(self, model):
+    def update(self, model):
+        cur_eval_loss = self.get_cur_eval_loss(model)
+        reward = - (cur_eval_loss - self.last_eval_loss)
+        self.last_eval_loss = cur_eval_loss
+        if self.sigmoid_normalize:
+            reward = torch.sigmoid(reward)
+        self.reward = reward.item()
+        self.update_weights()
+        self.set_action()
+        self.cur_dataloader = self.train_dataloaders[self.action]
+
+    def get_cur_eval_loss(self, model):
         batch_size = self.eval_dataloader.batch_size
         losses_host = None
         for _ in range(self.num_eval_batches_for_reward):
@@ -618,7 +620,8 @@ class MABLMTrainer(Trainer):
             if loss is not None:
                 losses = loss.repeat(batch_size)
                 losses_host = losses if losses_host is None else torch.cat((losses_host, losses), dim=0)
-        return losses_host.mean().item()
+        cur_eval_loss = losses_host.mean()
+        return cur_eval_loss
 
 
 class MABLMTrainerNaive(MABLMTrainer):
@@ -641,9 +644,9 @@ class MABLMTrainerNaive(MABLMTrainer):
         super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, num_groups, num_eval_batches_for_reward, steps_per_reward)
         self.weights = np.ones(self.num_groups) / self.num_groups
 
-    def get_action(self):
+    def set_action(self):
         action = randrange(self.num_groups)
-        return action
+        self.action = action
 
 
 class MABLMTrainerExp3(MABLMTrainer):
@@ -663,21 +666,22 @@ class MABLMTrainerExp3(MABLMTrainer):
             num_eval_batches_for_reward: int = None,
             steps_per_reward: int = None,
             gamma: float = None,
+            sigmoid_normalize: bool = False
     ):
-        super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, num_groups, num_eval_batches_for_reward, steps_per_reward)
+        super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, num_groups, num_eval_batches_for_reward, steps_per_reward, sigmoid_normalize)
         self.weights = np.ones(self.num_groups)
         self.gamma = np.sqrt(np.log(num_groups) / num_groups) if gamma is None else gamma
 
-    def get_action(self):
+    def set_action(self):
         probs = (1 - self.gamma) * self.weights / np.sum(self.weights) + self.gamma / self.num_groups
         action = np.random.choice(np.arange(self.num_groups), 1, p=probs).tolist()[0]
-        return action
+        self.action = action
 
     def weights_to_prob(self):
         return (1 - self.gamma) * self.weights / np.sum(self.weights) + self.gamma / self.num_groups
 
-    def update_weights(self, action):
+    def update_weights(self):
         reward = self.reward
         probs = self.weights_to_prob()
-        estimated_reward = reward / probs[action]
-        self.weights[action] = self.weights[action] * np.exp(self.gamma * estimated_reward / self.num_groups)
+        estimated_reward = reward / probs[self.action]
+        self.weights[self.action] = self.weights[self.action] * np.exp(self.gamma * estimated_reward / self.num_groups)
