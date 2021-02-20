@@ -59,7 +59,8 @@ class MABLMTrainer(Trainer):
             num_groups: int = None,
             num_eval_batches_for_reward: int = None,
             steps_per_reward: int = None,
-            sigmoid_normalize: bool = False
+            sigmoid_normalize: bool = False,
+            reward_scale: float = False
     ):
 
         logger.setLevel(logging.INFO)
@@ -221,6 +222,7 @@ class MABLMTrainer(Trainer):
         self.num_eval_batches_for_reward = num_eval_batches_for_reward
         self.steps_per_reward = steps_per_reward
         self.sigmoid_normalize = sigmoid_normalize
+        self.reward_scale = reward_scale
         self.action = 0
         self.cur_dataloader = None
         self.train_dataloaders = None
@@ -602,7 +604,7 @@ class MABLMTrainer(Trainer):
 
     def update(self, model):
         cur_eval_loss = self.get_cur_eval_loss(model)
-        reward = - (cur_eval_loss - self.last_eval_loss)
+        reward = - self.reward_scale * (cur_eval_loss - self.last_eval_loss)
         self.last_eval_loss = cur_eval_loss
         if self.sigmoid_normalize:
             reward = torch.sigmoid(reward)

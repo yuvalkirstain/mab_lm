@@ -159,6 +159,10 @@ class DataTrainingArguments:
         default=False,
         metadata={"help": "Normalize rewards using sigmoid for EXP3 algorithm."},
     )
+    reward_scale: float = field(
+        default=1.0,
+        metadata={"help": "Scaling factor for the reward (possibly before applying sigmoid)."},
+    )
 
     def __post_init__(self):
         if self.dataset_name is None and self.train_file is None and self.validation_file is None:
