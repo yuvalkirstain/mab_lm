@@ -45,7 +45,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 
-from mab_lm_trainer import MABLMTrainer, MABLMTrainerExp3, MABLMTrainerNaive
+from mab_lm_trainer import MABLMTrainer, MABLMTrainerExp3, MABLMTrainerNaive, MABLMTrainerEpsilonGreedy
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +141,7 @@ class DataTrainingArguments:
     )
     scoring_function: str = field(
         default=None,
-        metadata={"help": "exp3 or uniform"},
+        metadata={"help": "exp3, uniform, or epsilon greedy"},
     )
     num_eval_batches_for_reward: int = field(
         default=1,
@@ -153,7 +153,7 @@ class DataTrainingArguments:
     )
     gamma: float = field(
         default=None,
-        metadata={"help": "The gamma value for EXP3 algorithm."},
+        metadata={"help": "The gamma value for the specific algorithm."},
     )
     sigmoid_normalize: bool = field(
         default=False,
@@ -162,6 +162,10 @@ class DataTrainingArguments:
     reward_scale: float = field(
         default=1.0,
         metadata={"help": "Scaling factor for the reward (possibly before applying sigmoid)."},
+    )
+    epsilon: float = field(
+        default=None,
+        metadata={"help": "The epsilon value for the specific algorithm."},
     )
 
     def __post_init__(self):
@@ -401,6 +405,24 @@ def main():
             gamma=data_args.gamma,
             sigmoid_normalize=data_args.sigmoid_normalize,
             reward_scale=data_args.reward_scale
+        )
+    if data_args.scoring_function == "epsilon_greedy":
+        trainer = MABLMTrainerEpsilonGreedy(
+            model=model,
+            args=training_args,
+            train_datasets=[lm_datasets[f"train_{i}"] for i in
+                            range(data_args.num_groups)] if training_args.do_train else None,
+            eval_dataset=lm_datasets["validation"] if training_args.do_eval else None,
+            tokenizer=tokenizer,
+            # Data collator will default to DataCollatorWithPadding, so we change it.
+            data_collator=default_data_collator,
+            num_groups=data_args.num_groups,
+            num_eval_batches_for_reward=data_args.num_eval_batches_for_reward,
+            steps_per_reward=data_args.steps_per_reward,
+            gamma=data_args.gamma,
+            sigmoid_normalize=data_args.sigmoid_normalize,
+            reward_scale=data_args.reward_scale,
+            epsilon=data_args.epsilon
         )
     else:
         trainer = MABLMTrainerNaive(

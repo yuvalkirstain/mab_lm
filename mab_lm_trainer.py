@@ -691,3 +691,43 @@ class MABLMTrainerExp3(MABLMTrainer):
         probs = self.weights_to_prob()
         estimated_reward = reward / probs[self.action]
         self.weights[self.action] = self.weights[self.action] * np.exp(self.gamma * estimated_reward / self.num_groups)
+
+
+class MABLMTrainerEpsilonGreedy(MABLMTrainer):
+    def __init__(
+            self,
+            model: Union[PreTrainedModel, torch.nn.Module] = None,
+            args: TrainingArguments = None,
+            data_collator: Optional[DataCollator] = None,
+            train_datasets: Optional[List[Dataset]] = None,
+            eval_dataset: Optional[Dataset] = None,
+            tokenizer: Optional["PreTrainedTokenizerBase"] = None,
+            model_init: Callable[[], PreTrainedModel] = None,
+            compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+            callbacks: Optional[List[TrainerCallback]] = None,
+            optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
+            num_groups: int = None,
+            num_eval_batches_for_reward: int = None,
+            steps_per_reward: int = None,
+            gamma: float = None,
+            sigmoid_normalize: bool = False,
+            reward_scale: float = 1.0,
+            epsilon: float = None
+    ):
+        super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init,
+                         compute_metrics,  callbacks, optimizers, num_groups=num_groups,
+                         num_eval_batches_for_reward=num_eval_batches_for_reward, steps_per_reward=steps_per_reward,
+                         sigmoid_normalize=sigmoid_normalize, reward_scale=reward_scale)
+        self.weights = np.ones(self.num_groups)
+        self.gamma = np.sqrt(np.log(num_groups) / num_groups) if gamma is None else gamma
+        self.epsilon = epsilon
+
+    def set_action(self):
+        if np.random.ransom_sample() < self.epsilon:
+            self.action = np.random.choice(np.arange(self.num_groups), 1).tolist()[0]
+        else:
+            self.action = np.argmax(self.weights)
+
+    def update_weights(self):
+        reward = self.reward
+        self.weights[self.action] = (1 - self.gamma) * self.weights[self.action] + self.gamma * reward
