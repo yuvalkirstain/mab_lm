@@ -400,6 +400,7 @@ def main():
             steps_per_reward=data_args.steps_per_reward,
             gamma=data_args.gamma,
             sigmoid_normalize=data_args.sigmoid_normalize,
+            reward_scale=data_args.reward_scale
         )
     else:
         trainer = MABLMTrainerNaive(

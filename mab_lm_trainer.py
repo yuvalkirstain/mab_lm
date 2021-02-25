@@ -60,7 +60,7 @@ class MABLMTrainer(Trainer):
             num_eval_batches_for_reward: int = None,
             steps_per_reward: int = None,
             sigmoid_normalize: bool = False,
-            reward_scale: float = False
+            reward_scale: float = 1.0
     ):
 
         logger.setLevel(logging.INFO)
@@ -668,9 +668,13 @@ class MABLMTrainerExp3(MABLMTrainer):
             num_eval_batches_for_reward: int = None,
             steps_per_reward: int = None,
             gamma: float = None,
-            sigmoid_normalize: bool = False
+            sigmoid_normalize: bool = False,
+            reward_scale: float = 1.0,
     ):
-        super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, num_groups, num_eval_batches_for_reward, steps_per_reward, sigmoid_normalize)
+        super().__init__(model, args, data_collator, train_datasets, eval_dataset, tokenizer, model_init,
+                         compute_metrics,  callbacks, optimizers, num_groups=num_groups,
+                         num_eval_batches_for_reward=num_eval_batches_for_reward, steps_per_reward=steps_per_reward,
+                         sigmoid_normalize=sigmoid_normalize, reward_scale=reward_scale)
         self.weights = np.ones(self.num_groups)
         self.gamma = np.sqrt(np.log(num_groups) / num_groups) if gamma is None else gamma
 
