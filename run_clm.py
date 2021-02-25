@@ -179,7 +179,7 @@ class DataTrainingArguments:
                 extension = self.validation_file.split(".")[-1]
                 assert extension in ["csv", "json", "txt", "tokens"], "`validation_file` should be a csv, a json or a txt file."
 
-        assert self.scoring_function in ["exp3", "uniform"], "scoring_function should be exp3 or uniform"
+        assert self.scoring_function in ["exp3", "uniform", "epsilon_greedy"], "scoring_function should be exp3 or uniform"
 
 
 def main():
