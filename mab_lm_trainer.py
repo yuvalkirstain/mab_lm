@@ -731,3 +731,8 @@ class MABLMTrainerEpsilonGreedy(MABLMTrainer):
     def update_weights(self):
         reward = self.reward
         self.weights[self.action] = (1 - self.gamma) * self.weights[self.action] + self.gamma * reward
+
+    def weights_to_prob(self):
+        probs = np.zeros(self.num_groups)
+        probs[self.action] = 1
+        return probs
