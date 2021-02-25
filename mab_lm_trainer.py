@@ -723,7 +723,7 @@ class MABLMTrainerEpsilonGreedy(MABLMTrainer):
         self.epsilon = epsilon
 
     def set_action(self):
-        if np.random.ransom_sample() < self.epsilon:
+        if np.random.random_sample() < self.epsilon:
             self.action = np.random.choice(np.arange(self.num_groups), 1).tolist()[0]
         else:
             self.action = np.argmax(self.weights)
