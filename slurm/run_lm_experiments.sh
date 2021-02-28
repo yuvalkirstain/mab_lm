@@ -1,6 +1,7 @@
 #!/bin/bash
 
 OUTPUT_DIR="results"
+DATA_DIR="data/raw_data/wikitext-103"
 epsilon=-1
 gamma=-1
 REWARD_SCALE=10
@@ -15,18 +16,18 @@ for domain in "film" "road" "human"; do
 
     if [ $alg == "exp3" ]; then
       gamma="0.01"
-      train_paths="raw_data/wikitext-103/$domain/wiki*train.tokens"
+      train_paths="$DATA_DIR/$domain/wiki*train.tokens"
     fi
     if [ $alg == "epsilon_greedy" ]; then
       epsilon="0.1"
       gamma="0.1"
-      train_paths="raw_data/wikitext-103/$domain/wiki*train.tokens"
+      train_paths="$DATA_DIR/$domain/wiki*train.tokens"
     fi
     if [ $alg == "in_domain" ]; then
-      train_paths="raw_data/wikitext-103/$domain/wiki-$domain-in-domain.train.tokens"
+      train_paths="$DATA_DIR/$domain/wiki-$domain-in-domain.train.tokens"
     fi
     if [ $alg == "general" ]; then
-      train_paths="raw_data/wikitext-103/$domain/wiki.train.tokens"
+      train_paths="$DATA_DIR/$domain/wiki.train.tokens"
     fi
 
     sbatch --job-name=mab_lm \
