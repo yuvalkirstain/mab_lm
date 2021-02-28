@@ -406,7 +406,7 @@ def main():
             sigmoid_normalize=data_args.sigmoid_normalize,
             reward_scale=data_args.reward_scale
         )
-    if data_args.scoring_function == "epsilon_greedy":
+    elif data_args.scoring_function == "epsilon_greedy":
         trainer = MABLMTrainerEpsilonGreedy(
             model=model,
             args=training_args,
