@@ -1,0 +1,45 @@
+#!/bin/bash
+
+OUTPUT_DIR="results"
+epsilon=-1
+gamma=-1
+REWARD_SCALE=10
+
+for domain in "film" "road" "human"; do
+  for alg in "exp3" "in_domain" "general" "epsilon_greedy"; do
+
+    cur_output_dir="$OUTPUT_DIR/$alg-$domain"
+    mkdir -p $cur_output_dir
+
+    valid_path="raw_data/wikitext-103/$domain/wiki-$domain-in-domain.valid.tokens"
+
+    if [ $alg == "exp3" ]; then
+      gamma="0.01"
+      train_paths="raw_data/wikitext-103/$domain/wiki*train.tokens"
+    fi
+    if [ $alg == "epsilon_greedy" ]; then
+      epsilon="0.1"
+      gamma="0.1"
+      train_paths="raw_data/wikitext-103/$domain/wiki*train.tokens"
+    fi
+    if [ $alg == "in_domain" ]; then
+      train_paths="raw_data/wikitext-103/$domain/wiki-$domain-in-domain.train.tokens"
+    fi
+    if [ $alg == "general" ]; then
+      train_paths="raw_data/wikitext-103/$domain/wiki.train.tokens"
+    fi
+
+    sbatch --job-name=mab_lm \
+      --output="$OUTPUT_DIR.out" \
+      --error="$OUTPUT_DIR.err" \
+      --partition="killable"	\
+      --time=1440 \
+      --signal=USR1@120 \
+      --nodes=1 \
+      --ntasks=1 \
+      --mem=50000 \
+      --cpus-per-task=4 \
+      --gpus-per-task=1 \
+      /home/olab/kirstain/span-predictions/bash_scripts/slurm/prob/run_mrqa_experiment.sh "$alg" "$gamma" "$epsilon" "$REWARD_SCALE" "$cur_output_dir" "$train_paths" "$valid_path"
+  done
+done
