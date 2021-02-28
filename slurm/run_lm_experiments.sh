@@ -30,8 +30,8 @@ for domain in "film" "road" "human"; do
     fi
 
     sbatch --job-name=mab_lm \
-      --output="$OUTPUT_DIR.out" \
-      --error="$OUTPUT_DIR.err" \
+      --output="$cur_output_dir.out" \
+      --error="$cur_output_dir.err" \
       --partition="killable"	\
       --time=1440 \
       --signal=USR1@120 \
@@ -40,6 +40,6 @@ for domain in "film" "road" "human"; do
       --mem=50000 \
       --cpus-per-task=4 \
       --gpus-per-task=1 \
-      /home/olab/kirstain/span-predictions/bash_scripts/slurm/prob/run_mrqa_experiment.sh "$alg" "$gamma" "$epsilon" "$REWARD_SCALE" "$cur_output_dir" "$train_paths" "$valid_path"
+      slurm/run_single_lm_experiment.sh "$alg" "$gamma" "$epsilon" "$REWARD_SCALE" "$cur_output_dir" "$train_paths" "$valid_path"
   done
 done
