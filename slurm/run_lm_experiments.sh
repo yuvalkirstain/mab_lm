@@ -11,6 +11,12 @@ for domain in "film" "road" "human"; do
   for alg in "exp3" "in_domain" "general" "epsilon_greedy"; do
 
     cur_output_dir="$OUTPUT_DIR/$alg-$domain"
+
+    if test -f "$cur_output_dir.err"; then
+      echo "$cur_output_dir.err"
+      continue
+    fi
+
     mkdir -p $cur_output_dir
 
     valid_path="$DATA_DIR/$domain/wiki-$domain-in-domain.valid.tokens"
@@ -46,6 +52,6 @@ for domain in "film" "road" "human"; do
       --mem=50000 \
       --cpus-per-task=4 \
       --gpus-per-task=1 \
-      slurm/run_single_lm_experiment.sh "$alg" "$gamma" "$epsilon" "$REWARD_SCALE" "$cur_output_dir" "$train_paths" "$valid_path" "$ngroups"
+      slurm/run_single_lm_experiment.sh "$alg" "$gamma" "$epsilon" "$REWARD_SCALE" "$cur_output_dir" "$train_paths" "$valid_path" "$:q!::w"
   done
 done
