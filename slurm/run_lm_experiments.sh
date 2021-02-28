@@ -12,7 +12,7 @@ for domain in "film" "road" "human"; do
     cur_output_dir="$OUTPUT_DIR/$alg-$domain"
     mkdir -p $cur_output_dir
 
-    valid_path="raw_data/wikitext-103/$domain/wiki-$domain-in-domain.valid.tokens"
+    valid_path="$DATA_DIR/$domain/wiki-$domain-in-domain.valid.tokens"
 
     if [ $alg == "exp3" ]; then
       gamma="0.01"
