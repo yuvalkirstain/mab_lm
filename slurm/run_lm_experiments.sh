@@ -52,6 +52,6 @@ for domain in "film" "road" "human"; do
       --mem=50000 \
       --cpus-per-task=4 \
       --gpus-per-task=1 \
-      slurm/run_single_lm_experiment.sh "$alg" "$gamma" "$epsilon" "$REWARD_SCALE" "$cur_output_dir" "$train_paths" "$valid_path" "$:q!::w"
+      slurm/run_single_lm_experiment.sh "$alg" "$gamma" "$epsilon" "$REWARD_SCALE" "$cur_output_dir" "$train_paths" "$valid_path" "$ngroups"
   done
 done
