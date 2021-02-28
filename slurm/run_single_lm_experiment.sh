@@ -7,6 +7,7 @@ REWARD_SCALE=$4
 OUTPUT_DIR=$5
 TRAIN_PATHS=$6
 VALID_PATH=$7
+NGROUPS=$8
 
 python run_clm.py \
     --model_name_or_path="" \
@@ -19,7 +20,7 @@ python run_clm.py \
     --do_eval \
     --output_dir="$OUTPUT_DIR" \
     --cache_dir=../.cache \
-    --num_groups=2 \
+    --num_groups="$NGROUPS" \
     --per_device_train_batch_size=32 \
     --per_device_eval_batch_size=32 \
     --eval_steps=1000 \
