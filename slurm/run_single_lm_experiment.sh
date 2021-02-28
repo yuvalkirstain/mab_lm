@@ -13,7 +13,7 @@ python run_clm.py \
     --model_name_or_path="" \
     --model_type=gpt2 \
     --tokenizer_name=gpt2 \
-    --config_name=gpt2 \
+    --config_name=gpt2-6 \
     --train_file="$TRAIN_PATHS" \
     --validation_file="$VALID_PATH" \
     --do_train \
@@ -38,6 +38,5 @@ python run_clm.py \
     --num_eval_batches_for_reward=10 \
     --steps_per_reward=100 \
     --gamma="$GAMMA" \
-    --sigmoid_normalize \
     --reward_scale="$REWARD_SCALE" \
     --epsilon="$EPSILON"
