@@ -143,15 +143,16 @@ class MABLMTrainer(Trainer):
             logger.info("max_steps is given, it will override any value given in num_train_epochs")
 
         # Enforce rules on using datasets with no __len__
-        if any(train_dataset is not None and not isinstance(train_dataset, collections.abc.Sized) and args.max_steps <= 0 for train_dataset in train_datasets):
+        if train_datasets is not None and any(not isinstance(train_dataset, collections.abc.Sized) and args.max_steps <= 0 for train_dataset in train_datasets):
             raise ValueError("train_dataset does not implement __len__, max_steps has to be specified")
         if eval_dataset is not None and not isinstance(eval_dataset, collections.abc.Sized):
             raise ValueError("eval_dataset must implement __len__")
 
         if is_datasets_available():
-            for train_dataset in train_datasets:
-                if isinstance(train_dataset, datasets.Dataset):
-                    self._remove_unused_columns(train_dataset, description="training")
+            if train_datasets:
+                for train_dataset in train_datasets:
+                    if isinstance(train_dataset, datasets.Dataset):
+                        self._remove_unused_columns(train_dataset, description="training")
             if isinstance(eval_dataset, datasets.Dataset):
                 self._remove_unused_columns(self.eval_dataset, description="evaluation")
 

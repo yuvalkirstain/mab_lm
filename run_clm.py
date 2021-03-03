@@ -259,15 +259,20 @@ def main():
             )
     else:
         data_files = {}
-        train_files = glob(data_args.train_file)
-        assert len(train_files) == data_args.num_groups, "The number of groups argument needs to be equal to the number of train files."
-        for i, path in enumerate(train_files):
-            if data_args.train_file is not None:
-                data_files[f"train_{i}"] = path
-                logger.info(f"train_{i} path = {path}")
+        train_files = glob(data_args.train_file) if data_args.train_file is not None else None
+        assert train_files is None or len(train_files) == data_args.num_groups, "The number of groups argument needs to be equal to the number of train files."
+        if train_files is not None:
+            for i, path in enumerate(train_files):
+                if data_args.train_file is not None:
+                    data_files[f"train_{i}"] = path
+                    logger.info(f"train_{i} path = {path}")
+        else:
+            logger.info(f"validation path = {data_args.validation_file}")
+        check_file = data_args.train_file
         if data_args.validation_file is not None:
             data_files["validation"] = data_args.validation_file
-        extension = data_args.train_file.split(".")[-1]
+            check_file = data_args.validation_file
+        extension = check_file.split(".")[-1]
         if extension in ["txt", "tokens"]:
             extension = "text"
         datasets = load_dataset(extension, data_files=data_files)
@@ -439,15 +444,6 @@ def main():
             steps_per_reward=100000000
         )
 
-    # trainer = Trainer(
-    #     model=model,
-    #     args=training_args,
-    #     train_dataset=lm_datasets["train_0"] if training_args.do_train else None,
-    #     eval_dataset=lm_datasets["validation"] if training_args.do_eval else None,
-    #     tokenizer=tokenizer,
-    #     # Data collator will default to DataCollatorWithPadding, so we change it.
-    #     data_collator=default_data_collator,
-    # )
 
     # Training
     if training_args.do_train:
