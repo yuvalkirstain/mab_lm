@@ -179,7 +179,7 @@ class DataTrainingArguments:
                 extension = self.validation_file.split(".")[-1]
                 assert extension in ["csv", "json", "txt", "tokens"], "`validation_file` should be a csv, a json or a txt file."
 
-        assert self.scoring_function in ["exp3", "uniform", "epsilon_greedy", "in_domain", "general"], "scoring_function should be exp3 or uniform"
+        assert self.scoring_function in ["exp3", "uniform", "epsilon_greedy", "in_domain", "general", "regular"], "scoring_function should be exp3 or uniform"
 
 
 def main():
@@ -428,6 +428,16 @@ def main():
             sigmoid_normalize=data_args.sigmoid_normalize,
             reward_scale=data_args.reward_scale,
             epsilon=data_args.epsilon
+        )
+    elif data_args.scoring_function == "regular":
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=lm_datasets["train_0"] if training_args.do_train else None,
+            eval_dataset=lm_datasets["validation"] if training_args.do_eval else None,
+            tokenizer=tokenizer,
+            # Data collator will default to DataCollatorWithPadding, so we change it.
+            data_collator=default_data_collator,
         )
     else:
         trainer = MABLMTrainerNaive(
